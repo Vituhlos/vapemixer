@@ -28,6 +28,11 @@ router.post('/', validateHistory, (req, res) => {
   res.status(201).json(row);
 });
 
+router.delete('/', (req, res) => {
+  db.prepare('DELETE FROM history').run();
+  res.status(204).end();
+});
+
 router.delete('/:id', (req, res) => {
   db.prepare('DELETE FROM history WHERE id = ?').run(req.params.id);
   res.status(204).end();

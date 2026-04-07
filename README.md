@@ -60,12 +60,22 @@ Viz `docker-compose.unraid.yml`.
 ## Vývoj
 
 ```bash
+# Celý projekt najednou
+npm install
+npm run dev
+
 # Backend
-cd server && npm install && node index.js
+cd server && npm install && npm run dev
 
 # Frontend
 cd client && npm install && npm run dev
 ```
+
+Lokální vývoj na Windows:
+
+- Backend teď používá novější `better-sqlite3`, takže jde nainstalovat i lokálně bez Docker workflow.
+- API běží standardně na `http://localhost:3333`.
+- Frontend ve Vite dev serveru používá proxy na `/api`, takže stačí mít spuštěný backend i frontend paralelně.
 
 ## CI/CD
 

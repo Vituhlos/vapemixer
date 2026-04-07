@@ -1,5 +1,5 @@
 export default function GlassInput({ label, value, onChange, type = 'text', placeholder, min, max, step, className = '', suffix, inputMode }) {
-  const isNumeric = type === 'number';
+  const isNumeric = type === 'number' || inputMode === 'decimal' || inputMode === 'numeric';
 
   function handleChange(e) {
     let val = e.target.value;
@@ -7,6 +7,8 @@ export default function GlassInput({ label, value, onChange, type = 'text', plac
       val = val.replace(',', '.').replace(/[^0-9.]/g, '');
       const parts = val.split('.');
       if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+      if (min != null && val !== '' && Number(val) < Number(min)) val = String(val);
+      if (max != null && val !== '' && Number(val) > Number(max)) val = String(val);
     }
     onChange(val);
   }

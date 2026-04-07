@@ -1,32 +1,72 @@
 import { useState, useEffect } from 'react';
 import GlassCard from '../components/GlassCard.jsx';
+import GlassButton from '../components/GlassButton.jsx';
+import BottomSheet from '../components/BottomSheet.jsx';
 import SwipeToDelete from '../components/SwipeToDelete.jsx';
 import PullToRefresh from '../components/PullToRefresh.jsx';
 import { SkeletonList } from '../components/Skeleton.jsx';
+import StatusMessage from '../components/StatusMessage.jsx';
 import { api } from '../api.js';
 
-export default function History() {
+export default function History({ onLoad }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [search, setSearch] = useState('');
+  const [todayOnly, setTodayOnly] = useState(false);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function load() {
     setLoading(true);
-    try { setItems(await api.getHistory()); } catch {}
-    setLoading(false);
+    setStatus(null);
+    try {
+      setItems(await api.getHistory());
+    } catch (error) {
+      setStatus({ type: 'error', text: error.message || 'Nepodařilo se načíst historii' });
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleDelete(id) {
-    await api.deleteHistory(id);
-    setItems(i => i.filter(x => x.id !== id));
+    try {
+      await api.deleteHistory(id);
+      setItems((records) => records.filter((record) => record.id !== id));
+      setStatus({ type: 'ok', text: 'Záznam odstraněn' });
+    } catch (error) {
+      setStatus({ type: 'error', text: error.message || 'Mazání záznamu selhalo' });
+    }
+  }
+
+  async function handleClearAll() {
+    try {
+      await api.clearHistory();
+      setItems([]);
+      setConfirmClear(false);
+      setStatus({ type: 'ok', text: 'Historie vymazána' });
+    } catch (error) {
+      setStatus({ type: 'error', text: error.message || 'Vymazání historie selhalo' });
+    }
   }
 
   if (loading) return <div className="screen-enter"><SkeletonList count={3} /></div>;
 
+  const filteredItems = items.filter((item) => {
+    const query = search.trim().toLowerCase();
+    const matchesQuery = !query || [item.recipe_name, item.flavor_name, item.note]
+      .filter(Boolean)
+      .some((value) => value.toLowerCase().includes(query));
+
+    const matchesDate = !todayOnly || isToday(item.created_at);
+    return matchesQuery && matchesDate;
+  });
+
   if (items.length === 0) {
     return (
       <div className="screen-enter" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 192, gap: 8 }}>
+        <StatusMessage status={status} compact />
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--fg-subtle)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" />
         </svg>
@@ -40,7 +80,41 @@ export default function History() {
     <div className="flex flex-col h-full screen-enter">
       <PullToRefresh onRefresh={load}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 16 }}>
-          {items.map(item => (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              className="app-input"
+              style={{ flex: 1 }}
+              placeholder="Hledat v historii…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck="false"
+            />
+            <GlassButton
+              onClick={() => setTodayOnly((value) => !value)}
+              style={{
+                fontSize: 12,
+                padding: '8px 12px',
+                background: todayOnly ? 'var(--accent)' : undefined,
+                color: todayOnly ? '#0C0C10' : undefined,
+                borderColor: todayOnly ? 'var(--accent)' : undefined,
+              }}
+            >
+              Dnes
+            </GlassButton>
+            <GlassButton variant="danger" onClick={() => setConfirmClear(true)} style={{ fontSize: 12, padding: '8px 12px' }}>
+              Vymazat historii
+            </GlassButton>
+          </div>
+          <StatusMessage status={status} compact />
+          {filteredItems.length === 0 ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '28px 16px' }}>
+              <p style={{ color: 'var(--fg-muted)', fontSize: 14, margin: 0 }}>
+                Žádné záznamy pro aktuální filtr
+              </p>
+            </div>
+          ) : filteredItems.map((item) => (
             <SwipeToDelete key={item.id} onDelete={() => handleDelete(item.id)}>
               <GlassCard>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
@@ -62,10 +136,13 @@ export default function History() {
                         <span style={{ fontSize: 14, color: 'var(--fg-muted)' }}>bez receptu</span>
                       )}
                     </div>
-                    <p style={{ fontSize: 12, marginTop: 3, color: 'var(--fg-subtle)', margin: '3px 0 0' }}>
+                    <p style={{ fontSize: 12, color: 'var(--fg-subtle)', margin: '3px 0 0' }}>
                       {fmtDateTime(item.created_at)}
                     </p>
                   </div>
+                  <GlassButton onClick={() => onLoad?.(item)} style={{ fontSize: 12, padding: '6px 12px' }}>
+                    Načíst
+                  </GlassButton>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 12 }}>
@@ -78,15 +155,36 @@ export default function History() {
                 </div>
 
                 {item.note && (
-                  <p style={{ fontSize: 12, marginTop: 8, color: 'var(--fg-muted)', margin: '8px 0 0' }}>{item.note}</p>
+                  <p style={{ fontSize: 12, color: 'var(--fg-muted)', margin: '8px 0 0' }}>{item.note}</p>
                 )}
               </GlassCard>
             </SwipeToDelete>
           ))}
         </div>
       </PullToRefresh>
+
+      <BottomSheet open={confirmClear} onClose={() => setConfirmClear(false)} title="Vymazat celou historii?">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p style={{ fontSize: 14, color: 'var(--fg-muted)', margin: 0 }}>
+            Tohle smaže všechny záznamy míchání. Akci nepůjde vrátit.
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <GlassButton variant="danger" onClick={handleClearAll} className="flex-1">Vymazat vše</GlassButton>
+            <GlassButton onClick={() => setConfirmClear(false)} className="flex-1">Zrušit</GlassButton>
+          </div>
+        </div>
+      </BottomSheet>
     </div>
   );
+}
+
+function isToday(str) {
+  if (!str) return false;
+  const date = new Date(str);
+  const now = new Date();
+  return date.getFullYear() === now.getFullYear()
+    && date.getMonth() === now.getMonth()
+    && date.getDate() === now.getDate();
 }
 
 function MiniPill({ label, value, highlight }) {
@@ -111,8 +209,8 @@ function fmt1(v) { return (Math.round((v ?? 0) * 10) / 10).toFixed(1); }
 
 function fmtDateTime(str) {
   if (!str) return '';
-  const d = new Date(str);
-  return d.toLocaleString('cs-CZ', {
+  const date = new Date(str);
+  return date.toLocaleString('cs-CZ', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });

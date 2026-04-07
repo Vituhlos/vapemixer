@@ -3,6 +3,7 @@ import { mkdirSync } from 'fs';
 import { dirname } from 'path';
 
 const DB_PATH = process.env.DB_PATH || '/app/data/vapemixer.db';
+const SCHEMA_VERSION = 1;
 
 mkdirSync(dirname(DB_PATH), { recursive: true });
 
@@ -12,48 +13,86 @@ db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
 db.exec(`
-  CREATE TABLE IF NOT EXISTS recipes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    flavor_name TEXT,
-    volume_ml REAL NOT NULL,
-    nicotine_mg REAL NOT NULL,
-    vg_ratio INTEGER NOT NULL,
-    pg_ratio INTEGER NOT NULL,
-    booster_strength REAL NOT NULL DEFAULT 18,
-    flavor_pct REAL NOT NULL,
-    note TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS stock (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('baze_mtl','baze_dl','booster_mtl','booster_dl','prichut')),
-    amount_ml REAL NOT NULL DEFAULT 0,
-    capacity_ml REAL NOT NULL DEFAULT 100,
-    note TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    recipe_id INTEGER REFERENCES recipes(id) ON DELETE SET NULL,
-    recipe_name TEXT,
-    volume_ml REAL NOT NULL,
-    nicotine_mg REAL NOT NULL,
-    vg_ratio INTEGER NOT NULL,
-    pg_ratio INTEGER NOT NULL,
-    booster_strength REAL NOT NULL,
-    booster_ml REAL NOT NULL,
-    base_ml REAL NOT NULL,
-    flavor_ml REAL NOT NULL,
-    flavor_pct REAL NOT NULL,
-    flavor_name TEXT,
-    note TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  CREATE TABLE IF NOT EXISTS app_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
   );
 `);
+
+const migrations = [
+  {
+    version: 1,
+    up() {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS recipes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          flavor_name TEXT,
+          volume_ml REAL NOT NULL,
+          nicotine_mg REAL NOT NULL,
+          vg_ratio INTEGER NOT NULL,
+          pg_ratio INTEGER NOT NULL,
+          booster_strength REAL NOT NULL DEFAULT 18,
+          flavor_pct REAL NOT NULL,
+          note TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS stock (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL CHECK(type IN ('baze_mtl','baze_dl','booster_mtl','booster_dl','prichut')),
+          amount_ml REAL NOT NULL DEFAULT 0,
+          capacity_ml REAL NOT NULL DEFAULT 100,
+          note TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          recipe_id INTEGER REFERENCES recipes(id) ON DELETE SET NULL,
+          recipe_name TEXT,
+          volume_ml REAL NOT NULL,
+          nicotine_mg REAL NOT NULL,
+          vg_ratio INTEGER NOT NULL,
+          pg_ratio INTEGER NOT NULL,
+          booster_strength REAL NOT NULL,
+          booster_ml REAL NOT NULL,
+          base_ml REAL NOT NULL,
+          flavor_ml REAL NOT NULL,
+          flavor_pct REAL NOT NULL,
+          flavor_name TEXT,
+          note TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+      `);
+    },
+  },
+];
+
+function getSchemaVersion() {
+  const row = db.prepare(`SELECT value FROM app_meta WHERE key = 'schema_version'`).get();
+  return row ? Number(row.value) || 0 : 0;
+}
+
+const setSchemaVersion = db.prepare(`
+  INSERT INTO app_meta (key, value) VALUES ('schema_version', ?)
+  ON CONFLICT(key) DO UPDATE SET value = excluded.value
+`);
+
+db.transaction(() => {
+  let currentVersion = getSchemaVersion();
+  for (const migration of migrations) {
+    if (migration.version <= currentVersion) continue;
+    migration.up();
+    setSchemaVersion.run(String(migration.version));
+    currentVersion = migration.version;
+  }
+})();
+
+if (getSchemaVersion() !== SCHEMA_VERSION) {
+  setSchemaVersion.run(String(SCHEMA_VERSION));
+}
 
 // Seed data on first run
 const recipeCount = db.prepare('SELECT COUNT(*) as c FROM recipes').get();

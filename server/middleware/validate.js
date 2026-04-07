@@ -49,3 +49,40 @@ export function validateHistory(req, res, next) {
   if (errors.length) return res.status(400).json({ errors });
   next();
 }
+
+export function validateMix(req, res, next) {
+  const {
+    base_type, deduct_stock, recipe_id, recipe_name, flavor_name, note,
+    volume_ml, nicotine_mg, vg_ratio, pg_ratio, booster_strength,
+    booster_ml, base_ml, flavor_ml, flavor_pct,
+  } = req.body;
+  const errors = [];
+
+  const num = (v, name, min = 0) => {
+    if (v == null || isNaN(Number(v)) || Number(v) < min) errors.push(`${name} musí být číslo >= ${min}`);
+  };
+
+  if (base_type != null && !['MTL', 'DL', 'custom'].includes(base_type)) errors.push('base_type musí být MTL, DL nebo custom');
+  if (deduct_stock != null && typeof deduct_stock !== 'boolean') errors.push('deduct_stock musí být boolean');
+  if (recipe_id != null && (isNaN(Number(recipe_id)) || Number(recipe_id) < 1)) errors.push('recipe_id musí být kladné číslo');
+  if (recipe_name != null && typeof recipe_name !== 'string') errors.push('recipe_name musí být text');
+  if (flavor_name != null && typeof flavor_name !== 'string') errors.push('flavor_name musí být text');
+  if (note != null && typeof note !== 'string') errors.push('note musí být text');
+
+  num(volume_ml, 'volume_ml', 0.1);
+  num(nicotine_mg, 'nicotine_mg');
+  num(vg_ratio, 'vg_ratio');
+  num(pg_ratio, 'pg_ratio');
+  num(booster_strength, 'booster_strength', 0.1);
+  num(booster_ml, 'booster_ml');
+  num(base_ml, 'base_ml');
+  num(flavor_ml, 'flavor_ml');
+  num(flavor_pct, 'flavor_pct');
+
+  if (!isNaN(Number(vg_ratio)) && !isNaN(Number(pg_ratio)) && (Number(vg_ratio) + Number(pg_ratio) !== 100)) {
+    errors.push('vg_ratio a pg_ratio musí dohromady dát 100');
+  }
+
+  if (errors.length) return res.status(400).json({ errors });
+  next();
+}

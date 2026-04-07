@@ -1,9 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-
-const BASE_PRESETS = {
-  MTL: { vg: 50, pg: 50 },
-  DL:  { vg: 70, pg: 30 },
-};
+import { calculateMix, resolveBaseRatios } from '../lib/calc.js';
 
 const STORAGE_KEY = 'calc-state';
 
@@ -37,38 +33,10 @@ export function useCalculator(initial = {}) {
     } catch {}
   }, [volume, nicotine, baseType, customVG, customPG, boosterStrength, flavorPct, flavorName]);
 
-  const vg = baseType === 'custom' ? customVG : BASE_PRESETS[baseType]?.vg ?? 50;
-  const pg = baseType === 'custom' ? customPG : BASE_PRESETS[baseType]?.pg ?? 50;
+  const { vg, pg } = resolveBaseRatios(baseType, customVG, customPG);
 
   const result = useMemo(() => {
-    const vol = parseFloat(volume) || 0;
-    const nic = parseFloat(nicotine) || 0;
-    const bStr = parseFloat(boosterStrength) || 18;
-    const fPct = parseFloat(flavorPct) || 0;
-
-    if (vol <= 0) return null;
-
-    const flavorMl = (fPct / 100) * vol;
-    const boosterMl = nic > 0 ? (nic * vol) / bStr : 0;
-    const boosterBottles = Math.ceil(boosterMl / 10);
-    const baseMl = vol - flavorMl - boosterMl;
-
-    const warnings = [];
-    if (baseMl < 0) warnings.push('Záporná báze — příliš mnoho boosteru nebo příchutě');
-    if (nic > bStr) warnings.push(`Nikotin ${nic} mg překračuje sílu boosteru ${bStr} mg`);
-    if (fPct < 5) warnings.push('Příliš malá příchuť — doporučeno min. 5%');
-    if (fPct > 30) warnings.push('Příchuť přesahuje 30% — zkontroluj recept');
-
-    return {
-      flavorMl: Math.max(0, flavorMl),
-      boosterMl: Math.max(0, boosterMl),
-      boosterBottles,
-      baseMl: Math.max(0, baseMl),
-      resultVG: vg,
-      resultPG: pg,
-      warnings,
-      isValid: baseMl >= 0 && warnings.length === 0,
-    };
+    return calculateMix({ volume, nicotine, boosterStrength, flavorPct, vg, pg });
   }, [volume, nicotine, boosterStrength, flavorPct, vg, pg]);
 
   function loadRecipe(recipe) {
@@ -86,6 +54,21 @@ export function useCalculator(initial = {}) {
     }
   }
 
+  function loadHistory(entry) {
+    setVolume(entry.volume_ml);
+    setNicotine(entry.nicotine_mg);
+    setBoosterStrength(entry.booster_strength);
+    setFlavorPct(entry.flavor_pct);
+    setFlavorName(entry.flavor_name ?? '');
+    if (entry.vg_ratio === 50 && entry.pg_ratio === 50) setBaseType('MTL');
+    else if (entry.vg_ratio === 70 && entry.pg_ratio === 30) setBaseType('DL');
+    else {
+      setBaseType('custom');
+      setCustomVG(entry.vg_ratio);
+      setCustomPG(entry.pg_ratio);
+    }
+  }
+
   return {
     volume, setVolume,
     nicotine, setNicotine,
@@ -98,5 +81,6 @@ export function useCalculator(initial = {}) {
     vg, pg,
     result,
     loadRecipe,
+    loadHistory,
   };
 }

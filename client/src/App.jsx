@@ -45,6 +45,11 @@ export default function App() {
     changeTab('calculator');
   }
 
+  function handleLoadHistory(entry) {
+    calc.loadHistory(entry);
+    changeTab('calculator');
+  }
+
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -113,7 +118,7 @@ export default function App() {
           )}
           {tab === 'recipes'    && <Recipes onLoad={handleLoadRecipe} refreshKey={recipesKey} />}
           {tab === 'stock'      && <Stock />}
-          {tab === 'history'    && <History />}
+          {tab === 'history'    && <History onLoad={handleLoadHistory} />}
         </main>
 
         {/* Fade na spodu */}
