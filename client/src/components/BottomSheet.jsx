@@ -20,7 +20,7 @@ export default function BottomSheet({ open, onClose, title, children }) {
         transition: 'opacity 0.2s ease',
       }} />
       <div className="bottom-sheet" style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 51,
+        position: 'fixed', left: 0, right: 0, zIndex: 51,
         maxWidth: 430, margin: '0 auto',
         padding: '20px 20px max(20px, env(safe-area-inset-bottom))',
         transform: open ? 'translateY(0)' : 'translateY(100%)',

@@ -9,10 +9,19 @@ import { SkeletonList } from '../components/Skeleton.jsx';
 import StatusMessage from '../components/StatusMessage.jsx';
 import { api } from '../api.js';
 
+const PRESET_TAGS = ['MTL', 'DL', 'ovoce', 'tabák', 'mentol', 'dezert'];
+
+function parseTags(raw) {
+  if (!raw) return [];
+  try { return JSON.parse(raw); } catch { return []; }
+}
+
 export default function Recipes({ onLoad, refreshKey }) {
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [activeTag, setActiveTag] = useState(null);
   const [error, setError] = useState('');
   const [actionStatus, setActionStatus] = useState(null);
   const [editingRecipe, setEditingRecipe] = useState(null);
@@ -32,6 +41,7 @@ export default function Recipes({ onLoad, refreshKey }) {
       booster_strength: String(recipe.booster_strength ?? ''),
       flavor_pct: String(recipe.flavor_pct ?? ''),
       note: recipe.note ?? '',
+      tags: parseTags(recipe.tags),
     });
     setActionStatus(null);
   }
@@ -76,11 +86,24 @@ export default function Recipes({ onLoad, refreshKey }) {
         booster_strength: recipe.booster_strength,
         flavor_pct: recipe.flavor_pct,
         note: recipe.note,
+        tags: parseTags(recipe.tags),
       });
       setRecipes((items) => [copy, ...items]);
       setActionStatus({ type: 'ok', text: 'Recept zduplikován' });
     } catch (duplicateError) {
       setActionStatus({ type: 'error', text: duplicateError.message || 'Duplikace receptu selhala' });
+    }
+  }
+
+  async function handleToggleFavorite(id) {
+    try {
+      const updated = await api.toggleFavorite(id);
+      setRecipes((items) => {
+        const next = items.map((r) => r.id === id ? updated : r);
+        return [...next].sort((a, b) => b.is_favorite - a.is_favorite || new Date(b.created_at) - new Date(a.created_at));
+      });
+    } catch (err) {
+      setActionStatus({ type: 'error', text: err.message || 'Nepodařilo se změnit oblíbené' });
     }
   }
 
@@ -97,6 +120,7 @@ export default function Recipes({ onLoad, refreshKey }) {
         booster_strength: parseFloat(editForm.booster_strength),
         flavor_pct: parseFloat(editForm.flavor_pct),
         note: editForm.note || null,
+        tags: editForm.tags.length > 0 ? editForm.tags : null,
       });
       setRecipes((items) => items.map((item) => item.id === editingRecipe.id ? updated : item));
       setActionStatus({ type: 'ok', text: 'Recept upraven' });
@@ -117,7 +141,18 @@ export default function Recipes({ onLoad, refreshKey }) {
     URL.revokeObjectURL(url);
   }
 
+  function toggleEditTag(tag) {
+    setEditForm((form) => ({
+      ...form,
+      tags: form.tags.includes(tag) ? form.tags.filter((t) => t !== tag) : [...form.tags, tag],
+    }));
+  }
+
+  const allTags = [...new Set(recipes.flatMap((r) => parseTags(r.tags)))];
+
   const filtered = recipes.filter((recipe) => {
+    if (favoritesOnly && !recipe.is_favorite) return false;
+    if (activeTag && !parseTags(recipe.tags).includes(activeTag)) return false;
     if (!search.trim()) return true;
     const query = search.toLowerCase();
     return recipe.name.toLowerCase().includes(query) || (recipe.flavor_name || '').toLowerCase().includes(query);
@@ -127,7 +162,7 @@ export default function Recipes({ onLoad, refreshKey }) {
 
   return (
     <div className="flex flex-col h-full screen-enter">
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <div style={{ position: 'relative', flex: 1 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
             style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--fg-subtle)', pointerEvents: 'none' }}>
@@ -149,6 +184,27 @@ export default function Recipes({ onLoad, refreshKey }) {
         )}
       </div>
 
+      {/* Filter chips */}
+      {(allTags.length > 0 || recipes.some((r) => r.is_favorite)) && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+          <FilterChip
+            active={favoritesOnly}
+            onClick={() => setFavoritesOnly((v) => !v)}
+          >
+            <StarIcon filled={favoritesOnly} size={12} /> Oblíbené
+          </FilterChip>
+          {allTags.map((tag) => (
+            <FilterChip
+              key={tag}
+              active={activeTag === tag}
+              onClick={() => setActiveTag((t) => t === tag ? null : tag)}
+            >
+              {tag}
+            </FilterChip>
+          ))}
+        </div>
+      )}
+
       <StatusMessage status={error ? { type: 'error', text: error } : null} compact className="mb-3" />
       <StatusMessage status={actionStatus} compact className="mb-3" />
 
@@ -158,56 +214,83 @@ export default function Recipes({ onLoad, refreshKey }) {
             <rect x="4" y="2" width="16" height="20" rx="2" /><path d="M8 7h8M8 11h8M8 15h5" />
           </svg>
           <p style={{ color: 'var(--fg-muted)', fontSize: 14, margin: 0 }}>
-            {search ? 'Žádný výsledek' : 'Žádné recepty'}
+            {search || favoritesOnly || activeTag ? 'Žádný výsledek' : 'Žádné recepty'}
           </p>
-          {!search && <p style={{ color: 'var(--fg-subtle)', fontSize: 12, margin: 0 }}>Ulož recept v Mixeru</p>}
+          {!search && !favoritesOnly && !activeTag && (
+            <p style={{ color: 'var(--fg-subtle)', fontSize: 12, margin: 0 }}>Ulož recept v Mixeru</p>
+          )}
         </div>
       )}
 
       <PullToRefresh onRefresh={load}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 16 }}>
-          {filtered.map((recipe) => (
-            <SwipeToDelete key={recipe.id} onDelete={() => handleDelete(recipe.id)}>
-              <GlassCard>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontWeight: 600, fontSize: 15, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{recipe.name}</p>
-                    {recipe.flavor_name && (
-                      <p style={{ fontSize: 12, marginTop: 2, color: 'var(--fg-muted)', margin: '2px 0 0' }}>{recipe.flavor_name}</p>
-                    )}
+          {filtered.map((recipe) => {
+            const tags = parseTags(recipe.tags);
+            return (
+              <SwipeToDelete key={recipe.id} onDelete={() => handleDelete(recipe.id)}>
+                <GlassCard>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <button
+                          onClick={() => handleToggleFavorite(recipe.id)}
+                          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0, lineHeight: 0 }}
+                          aria-label={recipe.is_favorite ? 'Odebrat z oblíbených' : 'Přidat do oblíbených'}
+                        >
+                          <StarIcon filled={recipe.is_favorite === 1} size={16} />
+                        </button>
+                        <p style={{ fontWeight: 600, fontSize: 15, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{recipe.name}</p>
+                      </div>
+                      {recipe.flavor_name && (
+                        <p style={{ fontSize: 12, marginTop: 2, color: 'var(--fg-muted)', margin: '2px 0 0' }}>{recipe.flavor_name}</p>
+                      )}
+                      {tags.length > 0 && (
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 5 }}>
+                          {tags.map((tag) => (
+                            <span key={tag} style={{
+                              fontSize: 10, padding: '2px 7px', borderRadius: 5,
+                              background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                              color: 'var(--fg-muted)',
+                            }}>
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <GlassButton variant="primary" onClick={() => onLoad(recipe)} style={{ fontSize: 12, padding: '6px 14px' }}>
+                        Načíst
+                      </GlassButton>
+                      <GlassButton onClick={() => startEdit(recipe)} style={{ fontSize: 12, padding: '6px 10px' }} title="Upravit">
+                        Upravit
+                      </GlassButton>
+                      <GlassButton onClick={() => handleDuplicate(recipe)} style={{ fontSize: 12, padding: '6px 10px' }} title="Duplikovat">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                        </svg>
+                      </GlassButton>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <GlassButton variant="primary" onClick={() => onLoad(recipe)} style={{ fontSize: 12, padding: '6px 14px' }}>
-                      Načíst
-                    </GlassButton>
-                    <GlassButton onClick={() => startEdit(recipe)} style={{ fontSize: 12, padding: '6px 10px' }} title="Upravit">
-                      Upravit
-                    </GlassButton>
-                    <GlassButton onClick={() => handleDuplicate(recipe)} style={{ fontSize: 12, padding: '6px 10px' }} title="Duplikovat">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                      </svg>
-                    </GlassButton>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 12 }}>
+                    <Pill label="Objem" value={`${recipe.volume_ml} ml`} />
+                    <Pill label="Nikotin" value={`${recipe.nicotine_mg} mg`} highlight />
+                    <Pill label="Báze" value={`${recipe.vg_ratio}/${recipe.pg_ratio}`} />
+                    <Pill label="Booster" value={`${recipe.booster_strength} mg`} />
+                    <Pill label="Příchuť" value={`${recipe.flavor_pct}%`} />
+                    <Pill label="Vytvořen" value={fmtDate(recipe.created_at)} small />
                   </div>
-                </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 12 }}>
-                  <Pill label="Objem" value={`${recipe.volume_ml} ml`} />
-                  <Pill label="Nikotin" value={`${recipe.nicotine_mg} mg`} highlight />
-                  <Pill label="Báze" value={`${recipe.vg_ratio}/${recipe.pg_ratio}`} />
-                  <Pill label="Booster" value={`${recipe.booster_strength} mg`} />
-                  <Pill label="Příchuť" value={`${recipe.flavor_pct}%`} />
-                  <Pill label="Vytvořen" value={fmtDate(recipe.created_at)} small />
-                </div>
-
-                {recipe.note ? (
-                  <p style={{ fontSize: 12, color: 'var(--fg-muted)', margin: '10px 0 0' }}>{recipe.note}</p>
-                ) : (
-                  <p style={{ fontSize: 12, color: 'var(--fg-subtle)', margin: '10px 0 0' }}>Bez poznámky</p>
-                )}
-              </GlassCard>
-            </SwipeToDelete>
-          ))}
+                  {recipe.note ? (
+                    <p style={{ fontSize: 12, color: 'var(--fg-muted)', margin: '10px 0 0' }}>{recipe.note}</p>
+                  ) : (
+                    <p style={{ fontSize: 12, color: 'var(--fg-subtle)', margin: '10px 0 0' }}>Bez poznámky</p>
+                  )}
+                </GlassCard>
+              </SwipeToDelete>
+            );
+          })}
         </div>
       </PullToRefresh>
 
@@ -228,6 +311,28 @@ export default function Recipes({ onLoad, refreshKey }) {
             <GlassInput label="Příchuť %" value={editForm.flavor_pct} onChange={(value) => setEditForm((form) => ({ ...form, flavor_pct: value }))} suffix="%" />
           </div>
           <GlassInput label="Poznámka" value={editForm.note} onChange={(value) => setEditForm((form) => ({ ...form, note: value }))} placeholder="volitelné" />
+
+          <div>
+            <p style={{ fontSize: 12, color: 'var(--fg-muted)', margin: '0 0 7px' }}>Tagy</p>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {PRESET_TAGS.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => toggleEditTag(tag)}
+                  style={{
+                    fontSize: 12, padding: '5px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                    background: editForm.tags.includes(tag) ? 'var(--accent)' : 'var(--bg-elevated)',
+                    color: editForm.tags.includes(tag) ? '#0C0C10' : 'var(--fg)',
+                    transition: 'background 0.15s',
+                  }}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div style={{ display: 'flex', gap: 8 }}>
             <GlassButton variant="primary" onClick={handleSaveEdit} className="flex-1">Uložit změny</GlassButton>
             <GlassButton onClick={closeEdit} className="px-5">Zrušit</GlassButton>
@@ -249,7 +354,35 @@ function emptyRecipeForm() {
     booster_strength: '',
     flavor_pct: '',
     note: '',
+    tags: [],
   };
+}
+
+function StarIcon({ filled, size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? 'var(--accent)' : 'none'}
+      stroke={filled ? 'var(--accent)' : 'var(--fg-subtle)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  );
+}
+
+function FilterChip({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        fontSize: 12, padding: '5px 11px', borderRadius: 20, border: 'none', cursor: 'pointer',
+        background: active ? 'var(--accent)' : 'var(--bg-elevated)',
+        color: active ? '#0C0C10' : 'var(--fg-muted)',
+        transition: 'background 0.15s, color 0.15s',
+      }}
+    >
+      {children}
+    </button>
+  );
 }
 
 function Pill({ label, value, highlight, small }) {

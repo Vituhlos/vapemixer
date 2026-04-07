@@ -42,6 +42,7 @@ export const api = {
   getRecipes: () => request('/recipes'),
   createRecipe: (data) => request('/recipes', { method: 'POST', body: JSON.stringify(data) }),
   updateRecipe: (id, data) => request(`/recipes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  toggleFavorite: (id) => request(`/recipes/${id}/favorite`, { method: 'PATCH' }),
   deleteRecipe: (id) => request(`/recipes/${id}`, { method: 'DELETE' }),
 
   // Stock
