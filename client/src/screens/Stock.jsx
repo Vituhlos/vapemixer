@@ -3,6 +3,7 @@ import GlassCard from '../components/GlassCard.jsx';
 import GlassButton from '../components/GlassButton.jsx';
 import GlassInput from '../components/GlassInput.jsx';
 import BottomSheet from '../components/BottomSheet.jsx';
+import OrderImportSheet from '../components/OrderImportSheet.jsx';
 import PullToRefresh from '../components/PullToRefresh.jsx';
 import { SkeletonList } from '../components/Skeleton.jsx';
 import StatusMessage from '../components/StatusMessage.jsx';
@@ -24,10 +25,11 @@ export default function Stock() {
   const [adjusting, setAdjusting] = useState(null);
   const [adjustVal, setAdjustVal] = useState('');
   const [importStatus, setImportStatus] = useState(null);
+  const [orderImportOpen, setOrderImportOpen] = useState(false);
   const [error, setError] = useState('');
   const [editingItem, setEditingItem] = useState(null);
   const [editForm, setEditForm] = useState(emptyStockForm());
-  const [form, setForm] = useState({ name: '', type: 'baze_mtl', amount_ml: '', capacity_ml: 100, note: '' });
+  const [form, setForm] = useState({ name: '', type: 'baze_mtl', amount_ml: '', capacity_ml: 100, note: '', price_czk: '' });
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -56,9 +58,10 @@ export default function Stock() {
         amount_ml: parseFloat(form.amount_ml) || 0,
         capacity_ml: parseFloat(form.capacity_ml) || 100,
         note: form.note || null,
+        price_czk: form.price_czk !== '' ? parseFloat(form.price_czk) || null : null,
       });
       setItems((records) => [...records, item]);
-      setForm({ name: '', type: 'baze_mtl', amount_ml: '', capacity_ml: 100, note: '' });
+      setForm({ name: '', type: 'baze_mtl', amount_ml: '', capacity_ml: 100, note: '', price_czk: '' });
       setAdding(false);
       setImportStatus({ type: 'ok', text: 'Položka přidána' });
     } catch (addError) {
@@ -97,6 +100,7 @@ export default function Stock() {
       amount_ml: String(item.amount_ml ?? ''),
       capacity_ml: String(item.capacity_ml ?? ''),
       note: item.note ?? '',
+      price_czk: item.price_czk != null ? String(item.price_czk) : '',
     });
     setImportStatus(null);
   }
@@ -115,6 +119,7 @@ export default function Stock() {
         amount_ml: parseFloat(editForm.amount_ml) || 0,
         capacity_ml: parseFloat(editForm.capacity_ml) || 100,
         note: editForm.note || null,
+        price_czk: editForm.price_czk !== '' ? parseFloat(editForm.price_czk) || null : null,
       });
       setItems((records) => records.map((record) => record.id === editingItem.id ? updated : record));
       closeEdit();
@@ -162,6 +167,24 @@ export default function Stock() {
     }
   }
 
+  async function handleOrderImport(items) {
+    let added = 0;
+    for (const item of items) {
+      try {
+        const created = await api.createStock({
+          name: item.name,
+          type: item.type,
+          amount_ml: item.amount_ml,
+          capacity_ml: item.capacity_ml,
+          note: item.note || null,
+        });
+        setItems(prev => [...prev, created]);
+        added++;
+      } catch {}
+    }
+    setImportStatus({ type: 'ok', text: `Přidáno ${added} položek ze objednávky` });
+  }
+
   if (loading) return <div className="screen-enter"><SkeletonList count={2} /></div>;
 
   const grouped = TYPE_OPTIONS.map(([type, label]) => ({
@@ -194,6 +217,11 @@ export default function Stock() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <p style={{ fontWeight: 500, fontSize: 14, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</p>
+                            {item.price_czk != null && item.capacity_ml > 0 && (
+                              <span style={{ fontSize: 10, color: 'var(--fg-subtle)', flexShrink: 0, fontFamily: 'var(--font-mono, monospace)' }}>
+                                {(item.price_czk / item.capacity_ml).toFixed(2)} Kč/ml
+                              </span>
+                            )}
                             {statusLabel && (
                               <span style={{
                                 fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 6, flexShrink: 0,
@@ -291,6 +319,7 @@ export default function Stock() {
                   <GlassInput label="Množství (ml)" value={form.amount_ml} onChange={(value) => setForm((state) => ({ ...state, amount_ml: value }))} min={0} inputMode="decimal" />
                   <GlassInput label="Kapacita (ml)" value={form.capacity_ml} onChange={(value) => setForm((state) => ({ ...state, capacity_ml: value }))} min={1} inputMode="decimal" />
                 </div>
+                <GlassInput label="Cena (Kč)" value={form.price_czk} onChange={(value) => setForm((state) => ({ ...state, price_czk: value }))} placeholder="volitelné" inputMode="decimal" />
                 <GlassInput label="Poznámka" value={form.note} onChange={(value) => setForm((state) => ({ ...state, note: value }))} placeholder="volitelné" />
                 <div style={{ display: 'flex', gap: 8 }}>
                   <GlassButton variant="primary" onClick={handleAdd} className="flex-1">Přidat</GlassButton>
@@ -306,7 +335,7 @@ export default function Stock() {
               <div style={{ display: 'flex', gap: 8 }}>
                 {items.length > 0 && (
                   <GlassButton onClick={handleExport} style={{ flex: 1, padding: '10px 0', fontSize: 12 }}>
-                    Export skladu
+                    Export
                   </GlassButton>
                 )}
                 <label style={{ flex: 1 }}>
@@ -317,14 +346,23 @@ export default function Stock() {
                     background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)',
                     color: 'var(--fg-muted)', cursor: 'pointer', fontWeight: 500,
                   }}>
-                    Import skladu
+                    Import JSON
                   </span>
                 </label>
+                <GlassButton onClick={() => setOrderImportOpen(true)} style={{ flex: 1, padding: '10px 0', fontSize: 12 }}>
+                  Z objednávky
+                </GlassButton>
               </div>
             </div>
           )}
         </div>
       </PullToRefresh>
+
+      <OrderImportSheet
+        open={orderImportOpen}
+        onClose={() => setOrderImportOpen(false)}
+        onImport={handleOrderImport}
+      />
 
       <BottomSheet open={Boolean(editingItem)} onClose={closeEdit} title="Upravit položku skladu">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -334,6 +372,7 @@ export default function Stock() {
             <GlassInput label="Množství (ml)" value={editForm.amount_ml} onChange={(value) => setEditForm((state) => ({ ...state, amount_ml: value }))} />
             <GlassInput label="Kapacita (ml)" value={editForm.capacity_ml} onChange={(value) => setEditForm((state) => ({ ...state, capacity_ml: value }))} />
           </div>
+          <GlassInput label="Cena (Kč)" value={editForm.price_czk} onChange={(value) => setEditForm((state) => ({ ...state, price_czk: value }))} placeholder="volitelné" inputMode="decimal" />
           <GlassInput label="Poznámka" value={editForm.note} onChange={(value) => setEditForm((state) => ({ ...state, note: value }))} placeholder="volitelné" />
           <div style={{ display: 'flex', gap: 8 }}>
             <GlassButton variant="primary" onClick={handleSaveEdit} className="flex-1">Uložit změny</GlassButton>
@@ -372,11 +411,5 @@ function TypeButtons({ value, onChange }) {
 }
 
 function emptyStockForm() {
-  return {
-    name: '',
-    type: 'baze_mtl',
-    amount_ml: '',
-    capacity_ml: '',
-    note: '',
-  };
+  return { name: '', type: 'baze_mtl', amount_ml: '', capacity_ml: '', note: '', price_czk: '' };
 }

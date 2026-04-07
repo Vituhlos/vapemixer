@@ -6,14 +6,14 @@ const router = Router();
 
 const STOCK_TYPE_MAP = {
   MTL: { base: 'baze_mtl', booster: 'booster_mtl' },
-  DL: { base: 'baze_dl', booster: 'booster_dl' },
+  DL:  { base: 'baze_dl',  booster: 'booster_dl'  },
 };
 
 const insertHistory = db.prepare(`
   INSERT INTO history (
     recipe_id, recipe_name, volume_ml, nicotine_mg, vg_ratio, pg_ratio,
-    booster_strength, booster_ml, base_ml, flavor_ml, flavor_pct, flavor_name, note, stock_deducted
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    booster_strength, booster_ml, base_ml, flavor_ml, flavor_pct, flavor_name, note, stock_deducted, cost_czk
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 const getHistoryById = db.prepare('SELECT * FROM history WHERE id = ?');
@@ -35,13 +35,50 @@ function collectStockPlan(baseType, payload) {
     ? { type: 'prichut', needed: Number(payload.flavor_ml), label: `Příchuť: ${flavorName}`, items: namedFlavorItems }
     : { type: 'prichut', needed: Number(payload.flavor_ml), label: 'Příchuť', items: null };
   return [
-    { type: stockTypes.base, needed: Number(payload.base_ml), label: 'Báze' },
+    { type: stockTypes.base,    needed: Number(payload.base_ml),    label: 'Báze' },
     { type: stockTypes.booster, needed: Number(payload.booster_ml), label: 'Booster' },
     flavorEntry,
   ];
 }
 
 const runMix = db.transaction((payload) => {
+  let cost_czk = null;
+
+  if (payload.deduct_stock) {
+    const baseType = payload.base_type || resolveBasePreset(payload.vg_ratio, payload.pg_ratio);
+    const plan = collectStockPlan(baseType, payload);
+    let totalCost = 0;
+    let hasCost = false;
+
+    for (const entry of plan) {
+      if (entry.needed <= 0.01) continue;
+      const items = entry.items ?? getStockByType.all(entry.type);
+      const available = items.reduce((sum, item) => sum + Number(item.amount_ml || 0), 0);
+      if (available + 1e-9 < entry.needed) {
+        const error = new Error(`${entry.label}: nedostatek na skladě`);
+        error.status = 409;
+        error.details = { type: entry.type, label: entry.label, needed: entry.needed, available };
+        throw error;
+      }
+
+      let remaining = entry.needed;
+      for (const item of items) {
+        if (remaining <= 0) break;
+        const currentAmount = Number(item.amount_ml || 0);
+        const deduct = Math.min(currentAmount, remaining);
+        if (deduct <= 0) continue;
+        updateStockAmount.run(Math.max(0, currentAmount - deduct), item.id);
+        if (item.price_czk != null && item.capacity_ml > 0) {
+          totalCost += deduct * (Number(item.price_czk) / Number(item.capacity_ml));
+          hasCost = true;
+        }
+        remaining -= deduct;
+      }
+    }
+
+    cost_czk = hasCost ? Math.round(totalCost * 100) / 100 : null;
+  }
+
   const result = insertHistory.run(
     payload.recipe_id ?? null,
     payload.recipe_name?.trim() || null,
@@ -56,38 +93,12 @@ const runMix = db.transaction((payload) => {
     Number(payload.flavor_pct),
     payload.flavor_name?.trim() || null,
     payload.note?.trim() || null,
-    payload.deduct_stock ? 1 : 0
+    payload.deduct_stock ? 1 : 0,
+    cost_czk,
   );
 
   const history = getHistoryById.get(result.lastInsertRowid);
-  if (!payload.deduct_stock) {
-    return { history, stockUpdated: false };
-  }
-
-  const baseType = payload.base_type || resolveBasePreset(payload.vg_ratio, payload.pg_ratio);
-  const plan = collectStockPlan(baseType, payload);
-
-  for (const entry of plan) {
-    if (entry.needed <= 0.01) continue;
-    const items = entry.items ?? getStockByType.all(entry.type);
-    const available = items.reduce((sum, item) => sum + Number(item.amount_ml || 0), 0);
-    if (available + 1e-9 < entry.needed) {
-      const error = new Error(`${entry.label}: nedostatek na skladě`);
-      error.status = 409;
-      error.details = { type: entry.type, label: entry.label, needed: entry.needed, available };
-      throw error;
-    }
-
-    let remaining = entry.needed;
-    for (const item of items) {
-      if (remaining <= 0) break;
-      const currentAmount = Number(item.amount_ml || 0);
-      const deduct = Math.min(currentAmount, remaining);
-      if (deduct <= 0) continue;
-      updateStockAmount.run(Math.max(0, currentAmount - deduct), item.id);
-      remaining -= deduct;
-    }
-  }
+  if (!payload.deduct_stock) return { history, stockUpdated: false };
 
   return {
     history,

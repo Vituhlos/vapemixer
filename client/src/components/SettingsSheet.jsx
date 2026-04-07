@@ -35,7 +35,8 @@ export default function SettingsSheet({ open, onClose, prefs, updatePref }) {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Objem (ml)</span>
             <input
-              className="input"
+              className="app-input"
+              style={{ padding: '10px 12px' }}
               type="number"
               min="1"
               value={prefs.defaultVolume}
@@ -46,7 +47,8 @@ export default function SettingsSheet({ open, onClose, prefs, updatePref }) {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Nikotin (mg/ml)</span>
             <input
-              className="input"
+              className="app-input"
+              style={{ padding: '10px 12px' }}
               type="number"
               min="0"
               step="0.5"
@@ -58,7 +60,8 @@ export default function SettingsSheet({ open, onClose, prefs, updatePref }) {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Booster (mg/ml)</span>
             <input
-              className="input"
+              className="app-input"
+              style={{ padding: '10px 12px' }}
               type="number"
               min="1"
               value={prefs.defaultBoosterStrength}
@@ -69,7 +72,8 @@ export default function SettingsSheet({ open, onClose, prefs, updatePref }) {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Příchuť (%)</span>
             <input
-              className="input"
+              className="app-input"
+              style={{ padding: '10px 12px' }}
               type="number"
               min="0"
               max="50"

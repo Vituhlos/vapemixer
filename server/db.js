@@ -3,7 +3,7 @@ import { mkdirSync } from 'fs';
 import { dirname } from 'path';
 
 const DB_PATH = process.env.DB_PATH || '/app/data/vapemixer.db';
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 mkdirSync(dirname(DB_PATH), { recursive: true });
 
@@ -80,6 +80,15 @@ const migrations = [
       db.exec(`
         ALTER TABLE recipes ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0;
         ALTER TABLE recipes ADD COLUMN tags TEXT;
+      `);
+    },
+  },
+  {
+    version: 4,
+    up() {
+      db.exec(`
+        ALTER TABLE stock ADD COLUMN price_czk REAL;
+        ALTER TABLE history ADD COLUMN cost_czk REAL;
       `);
     },
   },

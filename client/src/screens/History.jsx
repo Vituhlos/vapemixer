@@ -154,6 +154,15 @@ export default function History({ onLoad }) {
                           sklad odečten
                         </span>
                       )}
+                      {item.cost_czk != null && (
+                        <span style={{
+                          fontSize: 10, padding: '2px 6px', borderRadius: 6,
+                          background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                          color: 'var(--fg-muted)', fontFamily: 'monospace',
+                        }}>
+                          ~{item.cost_czk.toFixed(1)} Kč
+                        </span>
+                      )}
                     </div>
                     <p style={{ fontSize: 12, color: 'var(--fg-subtle)', margin: '3px 0 0' }}>
                       {fmtDateTime(item.created_at)}

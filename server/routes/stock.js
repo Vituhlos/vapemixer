@@ -10,24 +10,24 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', validateStock, (req, res) => {
-  const { name, type, amount_ml, capacity_ml, note } = req.body;
+  const { name, type, amount_ml, capacity_ml, note, price_czk } = req.body;
   const result = db.prepare(`
-    INSERT INTO stock (name, type, amount_ml, capacity_ml, note)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(name.trim(), type, Number(amount_ml) ?? 0, Number(capacity_ml) ?? 100, note?.trim() || null);
+    INSERT INTO stock (name, type, amount_ml, capacity_ml, note, price_czk)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(name.trim(), type, Number(amount_ml) ?? 0, Number(capacity_ml) ?? 100, note?.trim() || null, price_czk != null ? Number(price_czk) : null);
   const row = db.prepare('SELECT * FROM stock WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(row);
 });
 
 router.put('/:id', validateStock, (req, res) => {
-  const { name, type, amount_ml, capacity_ml, note } = req.body;
+  const { name, type, amount_ml, capacity_ml, note, price_czk } = req.body;
   const existing = db.prepare('SELECT id FROM stock WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Položka nenalezena' });
 
   db.prepare(`
-    UPDATE stock SET name=?, type=?, amount_ml=?, capacity_ml=?, note=?
+    UPDATE stock SET name=?, type=?, amount_ml=?, capacity_ml=?, note=?, price_czk=?
     WHERE id=?
-  `).run(name.trim(), type, Number(amount_ml), Number(capacity_ml), note?.trim() || null, req.params.id);
+  `).run(name.trim(), type, Number(amount_ml), Number(capacity_ml), note?.trim() || null, price_czk != null ? Number(price_czk) : null, req.params.id);
   const row = db.prepare('SELECT * FROM stock WHERE id = ?').get(req.params.id);
   res.json(row);
 });
