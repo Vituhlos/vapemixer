@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Container version="2">
+  <Name>VapeMixer</Name>
+  <Repository>ghcr.io/vituhlos/vapemixer:latest</Repository>
+  <Registry>https://ghcr.io</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/Vituhlos/vapemixer/issues</Support>
+  <Project>https://github.com/Vituhlos/vapemixer</Project>
+  <ReadMe>https://raw.githubusercontent.com/Vituhlos/vapemixer/main/README.md</ReadMe>
+  <TemplateURL>https://raw.githubusercontent.com/Vituhlos/vapemixer/main/unraid/vapemixer.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/Vituhlos/vapemixer/main/client/public/icon-192.png</Icon>
+  <Overview>
+VapeMixer is a self-hosted DIY e-liquid calculator designed for mobile use as a PWA.
+
+Features:
+- mixer for base, booster, and flavor calculations
+- recipe saving, loading, duplication, and export
+- stock tracking with low-stock warnings
+- mixing history with quick reload back into the calculator
+
+Application data is stored in SQLite under /app/data, so the AppData path should be persisted.
+  </Overview>
+  <Category>Productivity: Tools:</Category>
+  <ExtraSearchTerms>vape e-liquid diy calculator pwa recipes stock sqlite</ExtraSearchTerms>
+  <WebUI>http://[IP]:[PORT:3333]</WebUI>
+  <Requires>A writable AppData path is required for the SQLite database.</Requires>
+  <Maintainer>Vituhlos</Maintainer>
+
+  <Config Name="Web UI Port" Target="3333" Default="3333" Mode="tcp" Description="Port used by the VapeMixer web interface." Type="Port" Display="always" Required="true" Mask="false">3333</Config>
+  <Config Name="AppData" Target="/app/data" Default="/mnt/user/appdata/vapemixer/data" Mode="rw" Description="Persistent folder for the SQLite database and application data." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/vapemixer/data</Config>
+  <Config Name="Timezone" Target="TZ" Default="Europe/Prague" Mode="" Description="Timezone for the container." Type="Variable" Display="advanced" Required="false" Mask="false">Europe/Prague</Config>
+</Container>

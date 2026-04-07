@@ -57,6 +57,11 @@ services:
 
 Viz `docker-compose.unraid.yml`.
 
+### Unraid Community Applications
+
+Hotovy CA template je v `unraid/vapemixer.xml`.
+Companion dokumentace k publikaci a lokalnimu pouziti je v `unraid/README.md`.
+
 ## Vývoj
 
 ```bash
