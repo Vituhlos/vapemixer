@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { calculateMix, resolveBaseRatios } from '../lib/calc.js';
+import { PREF_DEFAULTS } from './usePreferences.js';
 
 const STORAGE_KEY = 'calc-state';
 
@@ -10,18 +11,18 @@ function loadStored() {
   } catch { return {}; }
 }
 
-export function useCalculator(initial = {}) {
+export function useCalculator(prefs = {}) {
   const stored = loadStored();
-  const init = { ...stored, ...initial };
+  const defaults = { ...PREF_DEFAULTS, ...prefs };
 
-  const [volume, setVolume] = useState(init.volume ?? 60);
-  const [nicotine, setNicotine] = useState(init.nicotine ?? 6);
-  const [baseType, setBaseType] = useState(init.baseType ?? 'MTL');
-  const [customVG, setCustomVG] = useState(init.customVG ?? 50);
-  const [customPG, setCustomPG] = useState(init.customPG ?? 50);
-  const [boosterStrength, setBoosterStrength] = useState(init.boosterStrength ?? 18);
-  const [flavorPct, setFlavorPct] = useState(init.flavorPct ?? 17);
-  const [flavorName, setFlavorName] = useState(init.flavorName ?? '');
+  const [volume, setVolume] = useState(stored.volume ?? defaults.defaultVolume);
+  const [nicotine, setNicotine] = useState(stored.nicotine ?? defaults.defaultNicotine);
+  const [baseType, setBaseType] = useState(stored.baseType ?? defaults.defaultBaseType);
+  const [customVG, setCustomVG] = useState(stored.customVG ?? 50);
+  const [customPG, setCustomPG] = useState(stored.customPG ?? 50);
+  const [boosterStrength, setBoosterStrength] = useState(stored.boosterStrength ?? defaults.defaultBoosterStrength);
+  const [flavorPct, setFlavorPct] = useState(stored.flavorPct ?? defaults.defaultFlavorPct);
+  const [flavorName, setFlavorName] = useState(stored.flavorName ?? '');
 
   // Persist to localStorage on every change
   useEffect(() => {
@@ -54,6 +55,17 @@ export function useCalculator(initial = {}) {
     }
   }
 
+  function resetToDefaults() {
+    setVolume(defaults.defaultVolume);
+    setNicotine(defaults.defaultNicotine);
+    setBaseType(defaults.defaultBaseType);
+    setCustomVG(50);
+    setCustomPG(50);
+    setBoosterStrength(defaults.defaultBoosterStrength);
+    setFlavorPct(defaults.defaultFlavorPct);
+    setFlavorName('');
+  }
+
   function loadHistory(entry) {
     setVolume(entry.volume_ml);
     setNicotine(entry.nicotine_mg);
@@ -82,5 +94,7 @@ export function useCalculator(initial = {}) {
     result,
     loadRecipe,
     loadHistory,
+    resetToDefaults,
+    defaults,
   };
 }

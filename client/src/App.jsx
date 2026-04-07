@@ -5,7 +5,9 @@ import Recipes from './screens/Recipes.jsx';
 import Stock from './screens/Stock.jsx';
 import History from './screens/History.jsx';
 import PWABanner from './components/PWABanner.jsx';
+import SettingsSheet from './components/SettingsSheet.jsx';
 import { useCalculator } from './hooks/useCalculator.js';
+import { usePreferences } from './hooks/usePreferences.js';
 import { api } from './api.js';
 
 const TAB_ORDER = ['calculator', 'recipes', 'stock', 'history'];
@@ -19,7 +21,9 @@ export default function App() {
   const [animDir, setAnimDir] = useState(1);
   const [recipesKey, setRecipesKey] = useState(0);
   const [stockBadge, setStockBadge] = useState(false);
-  const calc = useCalculator();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const { prefs, updatePref } = usePreferences();
+  const calc = useCalculator(prefs);
 
   const checkStock = useCallback(async () => {
     try {
@@ -84,6 +88,19 @@ export default function App() {
             <p style={{ margin: 0, fontSize: 11, color: 'var(--fg-muted)' }}>DIY e-liquid kalkulačka</p>
           </div>
         </div>
+        <button
+          onClick={() => setSettingsOpen(true)}
+          style={{
+            background: 'none', border: 'none', padding: 6, borderRadius: 8,
+            color: 'var(--fg-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center',
+          }}
+          aria-label="Nastavení"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
       </header>
 
       {/* PWA banner */}
@@ -133,6 +150,8 @@ export default function App() {
       <div style={{ flexShrink: 0 }}>
         <BottomNav active={tab} onChange={changeTab} badges={{ stock: stockBadge }} />
       </div>
+
+      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} prefs={prefs} updatePref={updatePref} />
     </div>
   );
 }

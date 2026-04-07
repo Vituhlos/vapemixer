@@ -40,6 +40,16 @@ export default function History({ onLoad }) {
     }
   }
 
+  async function handleRevert(id) {
+    try {
+      await api.revertMix(id);
+      setItems((records) => records.map((r) => r.id === id ? { ...r, stock_deducted: 0 } : r));
+      setStatus({ type: 'ok', text: 'Odečet skladu byl vrácen' });
+    } catch (error) {
+      setStatus({ type: 'error', text: error.message || 'Vrácení odečtu selhalo' });
+    }
+  }
+
   async function handleClearAll() {
     try {
       await api.clearHistory();
@@ -135,14 +145,30 @@ export default function History({ onLoad }) {
                       {!item.recipe_name && !item.flavor_name && (
                         <span style={{ fontSize: 14, color: 'var(--fg-muted)' }}>bez receptu</span>
                       )}
+                      {item.stock_deducted === 1 && (
+                        <span style={{
+                          fontSize: 10, padding: '2px 6px', borderRadius: 6,
+                          background: 'rgba(50,215,75,0.12)', border: '1px solid rgba(50,215,75,0.3)',
+                          color: 'var(--success)',
+                        }}>
+                          sklad odečten
+                        </span>
+                      )}
                     </div>
                     <p style={{ fontSize: 12, color: 'var(--fg-subtle)', margin: '3px 0 0' }}>
                       {fmtDateTime(item.created_at)}
                     </p>
                   </div>
-                  <GlassButton onClick={() => onLoad?.(item)} style={{ fontSize: 12, padding: '6px 12px' }}>
-                    Načíst
-                  </GlassButton>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    {item.stock_deducted === 1 && (
+                      <GlassButton onClick={() => handleRevert(item.id)} style={{ fontSize: 12, padding: '6px 10px' }}>
+                        Vrátit
+                      </GlassButton>
+                    )}
+                    <GlassButton onClick={() => onLoad?.(item)} style={{ fontSize: 12, padding: '6px 12px' }}>
+                      Načíst
+                    </GlassButton>
+                  </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 12 }}>

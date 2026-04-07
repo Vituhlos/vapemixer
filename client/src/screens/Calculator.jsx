@@ -80,10 +80,17 @@ export default function Calculator({ calc, onSaved, onStockChange }) {
     if (!result) return null;
     const baseTypeKey = baseType === 'DL' ? 'baze_dl' : 'baze_mtl';
     const boosterKey = baseType === 'DL' ? 'booster_dl' : 'booster_mtl';
+    const allPrichut = stock.filter((item) => item.type === 'prichut');
+    const trimmedFlavorName = flavorName?.trim() || '';
+    const namedFlavor = trimmedFlavorName
+      ? allPrichut.filter((item) => item.name.toLowerCase() === trimmedFlavorName.toLowerCase())
+      : [];
+    const flavorItems = namedFlavor.length > 0 ? namedFlavor : allPrichut;
+    const flavorLabel = namedFlavor.length > 0 ? `Příchuť: ${trimmedFlavorName}` : 'Příchuť';
     return {
       base: { items: stock.filter((item) => item.type === baseTypeKey), needed: result.baseMl, label: baseTypeKey === 'baze_mtl' ? 'Báze MTL' : 'Báze DL' },
       booster: { items: stock.filter((item) => item.type === boosterKey), needed: result.boosterMl, label: boosterKey === 'booster_mtl' ? 'Booster MTL' : 'Booster DL' },
-      flavor: { items: stock.filter((item) => item.type === 'prichut'), needed: result.flavorMl, label: 'Příchuť' },
+      flavor: { items: flavorItems, needed: result.flavorMl, label: flavorLabel },
     };
   }
 
@@ -200,12 +207,7 @@ export default function Calculator({ calc, onSaved, onStockChange }) {
   }
 
   function handleReset() {
-    calc.setVolume(60);
-    calc.setNicotine(6);
-    calc.setBaseType('MTL');
-    calc.setBoosterStrength(18);
-    calc.setFlavorPct(17);
-    calc.setFlavorName('');
+    calc.resetToDefaults();
     setRecipeName('');
     setFlavorMode('pct');
     setFlavorMlInput('');

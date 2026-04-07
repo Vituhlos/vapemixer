@@ -55,6 +55,7 @@ export const api = {
   createHistory: (data) => request('/history', { method: 'POST', body: JSON.stringify(data) }),
   clearHistory: () => request('/history', { method: 'DELETE' }),
   deleteHistory: (id) => request(`/history/${id}`, { method: 'DELETE' }),
+  revertMix: (id) => request(`/history/${id}/revert`, { method: 'POST' }),
 
   // Mix
   createMix: (data) => request('/mix', { method: 'POST', body: JSON.stringify(data) }),

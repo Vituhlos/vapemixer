@@ -12,12 +12,13 @@ const STOCK_TYPE_MAP = {
 const insertHistory = db.prepare(`
   INSERT INTO history (
     recipe_id, recipe_name, volume_ml, nicotine_mg, vg_ratio, pg_ratio,
-    booster_strength, booster_ml, base_ml, flavor_ml, flavor_pct, flavor_name, note
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    booster_strength, booster_ml, base_ml, flavor_ml, flavor_pct, flavor_name, note, stock_deducted
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 const getHistoryById = db.prepare('SELECT * FROM history WHERE id = ?');
 const getStockByType = db.prepare('SELECT * FROM stock WHERE type = ? ORDER BY created_at ASC, id ASC');
+const getFlavorStockByName = db.prepare('SELECT * FROM stock WHERE type = \'prichut\' AND LOWER(name) = LOWER(?) ORDER BY created_at ASC, id ASC');
 const updateStockAmount = db.prepare('UPDATE stock SET amount_ml = ? WHERE id = ?');
 
 function resolveBasePreset(vgRatio, pgRatio) {
@@ -28,10 +29,15 @@ function resolveBasePreset(vgRatio, pgRatio) {
 
 function collectStockPlan(baseType, payload) {
   const stockTypes = STOCK_TYPE_MAP[baseType] || STOCK_TYPE_MAP.MTL;
+  const flavorName = payload.flavor_name?.trim() || null;
+  const namedFlavorItems = flavorName ? getFlavorStockByName.all(flavorName) : [];
+  const flavorEntry = namedFlavorItems.length > 0
+    ? { type: 'prichut', needed: Number(payload.flavor_ml), label: `Příchuť: ${flavorName}`, items: namedFlavorItems }
+    : { type: 'prichut', needed: Number(payload.flavor_ml), label: 'Příchuť', items: null };
   return [
     { type: stockTypes.base, needed: Number(payload.base_ml), label: 'Báze' },
     { type: stockTypes.booster, needed: Number(payload.booster_ml), label: 'Booster' },
-    { type: 'prichut', needed: Number(payload.flavor_ml), label: 'Příchuť' },
+    flavorEntry,
   ];
 }
 
@@ -49,7 +55,8 @@ const runMix = db.transaction((payload) => {
     Number(payload.flavor_ml),
     Number(payload.flavor_pct),
     payload.flavor_name?.trim() || null,
-    payload.note?.trim() || null
+    payload.note?.trim() || null,
+    payload.deduct_stock ? 1 : 0
   );
 
   const history = getHistoryById.get(result.lastInsertRowid);
@@ -62,7 +69,7 @@ const runMix = db.transaction((payload) => {
 
   for (const entry of plan) {
     if (entry.needed <= 0.01) continue;
-    const items = getStockByType.all(entry.type);
+    const items = entry.items ?? getStockByType.all(entry.type);
     const available = items.reduce((sum, item) => sum + Number(item.amount_ml || 0), 0);
     if (available + 1e-9 < entry.needed) {
       const error = new Error(`${entry.label}: nedostatek na skladě`);
