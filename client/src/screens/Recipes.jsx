@@ -141,6 +141,41 @@ export default function Recipes({ onLoad, refreshKey }) {
     URL.revokeObjectURL(url);
   }
 
+  async function handleImport(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!Array.isArray(data)) throw new Error('Neplatný formát');
+      let added = 0;
+      for (const item of data) {
+        if (!item.name) continue;
+        let tags = item.tags;
+        if (typeof tags === 'string') { try { tags = JSON.parse(tags); } catch { tags = []; } }
+        if (!Array.isArray(tags)) tags = [];
+        await api.createRecipe({
+          name: item.name,
+          flavor_name: item.flavor_name || null,
+          volume_ml: parseFloat(item.volume_ml) || 60,
+          nicotine_mg: parseFloat(item.nicotine_mg) || 0,
+          vg_ratio: parseFloat(item.vg_ratio) || 70,
+          pg_ratio: parseFloat(item.pg_ratio) || 30,
+          booster_strength: parseFloat(item.booster_strength) || 18,
+          flavor_pct: parseFloat(item.flavor_pct) || 0,
+          note: item.note || null,
+          tags: tags.length > 0 ? tags : null,
+        });
+        added++;
+      }
+      await load();
+      setActionStatus({ type: 'ok', text: `Importováno ${added} receptů` });
+    } catch (importError) {
+      setActionStatus({ type: 'error', text: importError.message || 'Chyba importu' });
+    }
+  }
+
   function toggleEditTag(tag) {
     setEditForm((form) => ({
       ...form,
@@ -182,6 +217,17 @@ export default function Recipes({ onLoad, refreshKey }) {
             Export
           </GlassButton>
         )}
+        <label style={{ flexShrink: 0 }}>
+          <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
+          <span style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '0 14px', height: '100%', minHeight: 38, fontSize: 12, borderRadius: 10,
+            background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)',
+            color: 'var(--fg-muted)', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap',
+          }}>
+            Import
+          </span>
+        </label>
       </div>
 
       {/* Filter chips */}

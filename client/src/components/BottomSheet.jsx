@@ -23,7 +23,7 @@ export default function BottomSheet({ open, onClose, title, children }) {
         position: 'fixed', left: 0, right: 0, zIndex: 51,
         maxWidth: 430, margin: '0 auto',
         padding: '20px 20px max(20px, env(safe-area-inset-bottom))',
-        transform: open ? 'translateY(0)' : 'translateY(100%)',
+        transform: open ? 'translateY(0)' : 'translateY(calc(100% + 24px))',
         transition: 'transform 0.3s cubic-bezier(0.32,0.72,0,1)',
       }}>
         <div style={{ width: 32, height: 3, borderRadius: 2, background: 'var(--border)', margin: '-8px auto 16px' }} />

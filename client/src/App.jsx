@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import BottomNav from './components/BottomNav.jsx';
+import SideNav from './components/SideNav.jsx';
 import Calculator from './screens/Calculator.jsx';
 import Recipes from './screens/Recipes.jsx';
 import Stock from './screens/Stock.jsx';
@@ -22,8 +23,16 @@ export default function App() {
   const [recipesKey, setRecipesKey] = useState(0);
   const [stockBadge, setStockBadge] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 700px)').matches);
   const { prefs, updatePref } = usePreferences();
   const calc = useCalculator(prefs);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 700px)');
+    const handler = (e) => setIsDesktop(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   const checkStock = useCallback(async () => {
     try {
@@ -36,9 +45,7 @@ export default function App() {
 
   function changeTab(next) {
     if (next === tab) return;
-    // Clear badge when navigating to stock
     if (next === 'stock') setStockBadge(false);
-    // Re-check when leaving stock (user may have restocked)
     if (tab === 'stock') checkStock();
     setAnimDir(TAB_ORDER.indexOf(next) > TAB_ORDER.indexOf(tab) ? 1 : -1);
     setTab(next);
@@ -54,6 +61,64 @@ export default function App() {
     changeTab('calculator');
   }
 
+  const contentArea = (
+    <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+      <main
+        key={tab}
+        className="scrollable"
+        style={{
+          height: '100%',
+          padding: isDesktop ? '20px 24px 24px' : '16px 16px 24px',
+          overflowY: 'auto',
+          animation: `tabSlideIn${animDir > 0 ? 'Right' : 'Left'} 0.2s var(--easing)`,
+        }}
+        onTouchStart={(e) => {
+          const tag = e.target.tagName.toLowerCase();
+          if (!['input', 'textarea', 'select'].includes(tag) && !e.target.closest('button')) {
+            document.activeElement?.blur();
+          }
+        }}
+      >
+        {tab === 'calculator' && (
+          <Calculator
+            calc={calc}
+            onSaved={() => setRecipesKey(k => k + 1)}
+            onStockChange={checkStock}
+          />
+        )}
+        {tab === 'recipes'  && <Recipes onLoad={handleLoadRecipe} refreshKey={recipesKey} />}
+        {tab === 'stock'    && <Stock />}
+        {tab === 'history'  && <History onLoad={handleLoadHistory} />}
+      </main>
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0, height: 28,
+        background: 'linear-gradient(to bottom, transparent, var(--bg))',
+        pointerEvents: 'none',
+      }} />
+    </div>
+  );
+
+  if (isDesktop) {
+    return (
+      <div style={{
+        position: 'fixed', top: 20, bottom: 20, left: 0, right: 0,
+        maxWidth: 960, margin: '0 auto',
+        display: 'flex', flexDirection: 'row',
+        background: 'var(--bg)',
+        overflow: 'hidden',
+        borderRadius: 20,
+        boxShadow: '0 0 0 1px rgba(255,255,255,0.08), 0 0 0 1px rgba(0,194,170,0.06), 0 24px 80px rgba(0,0,0,0.7)',
+      }}>
+        <SideNav active={tab} onChange={changeTab} badges={{ stock: stockBadge }} onSettings={() => setSettingsOpen(true)} />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+          <div style={{ flexShrink: 0 }}><PWABanner /></div>
+          {contentArea}
+        </div>
+        <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} prefs={prefs} updatePref={updatePref} />
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell" style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -62,7 +127,6 @@ export default function App() {
       background: 'var(--bg)',
       overflow: 'hidden',
     }}>
-      {/* Header */}
       <header style={{
         flexShrink: 0,
         padding: '14px 20px 10px',
@@ -103,50 +167,12 @@ export default function App() {
         </button>
       </header>
 
-      {/* PWA banner */}
       <div style={{ flexShrink: 0, paddingTop: 8 }}>
         <PWABanner />
       </div>
 
-      {/* Content */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        <main
-          key={tab}
-          className="scrollable"
-          style={{
-            height: '100%',
-            padding: '16px 16px 24px',
-            overflowY: 'auto',
-            animation: `tabSlideIn${animDir > 0 ? 'Right' : 'Left'} 0.2s var(--easing)`,
-          }}
-          onTouchStart={(e) => {
-            const tag = e.target.tagName.toLowerCase();
-            if (!['input', 'textarea', 'select'].includes(tag) && !e.target.closest('button')) {
-              document.activeElement?.blur();
-            }
-          }}
-        >
-          {tab === 'calculator' && (
-            <Calculator
-              calc={calc}
-              onSaved={() => setRecipesKey(k => k + 1)}
-              onStockChange={checkStock}
-            />
-          )}
-          {tab === 'recipes'    && <Recipes onLoad={handleLoadRecipe} refreshKey={recipesKey} />}
-          {tab === 'stock'      && <Stock />}
-          {tab === 'history'    && <History onLoad={handleLoadHistory} />}
-        </main>
+      {contentArea}
 
-        {/* Fade na spodu */}
-        <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0, height: 28,
-          background: 'linear-gradient(to bottom, transparent, var(--bg))',
-          pointerEvents: 'none',
-        }} />
-      </div>
-
-      {/* Bottom Nav */}
       <div style={{ flexShrink: 0 }}>
         <BottomNav active={tab} onChange={changeTab} badges={{ stock: stockBadge }} />
       </div>
