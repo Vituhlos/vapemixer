@@ -1,0 +1,10 @@
+{
+  "name": "vapemixer-server",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "better-sqlite3": "^9.6.0",
+    "express": "^5.0.1",
+    "cors": "^2.8.5"
+  }
+}
