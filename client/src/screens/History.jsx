@@ -75,7 +75,7 @@ export default function History({ onLoad }) {
 
   if (items.length === 0) {
     return (
-      <div className="screen-enter" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 192, gap: 8 }}>
+      <div className="screen-enter panel-surface" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 192, gap: 8, padding: 16 }}>
         <StatusMessage status={status} compact />
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--fg-subtle)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" />
@@ -89,11 +89,19 @@ export default function History({ onLoad }) {
   return (
     <div className="flex flex-col h-full screen-enter">
       <PullToRefresh onRefresh={load}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 16 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 16 }}>
+          <div className="panel-surface" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <div className="section-kicker">Historie</div>
+              <p style={{ fontSize: 15, fontWeight: 700, margin: '6px 0 0' }}>Log míchání i skladový doklad</p>
+              <p style={{ fontSize: 12, color: 'var(--fg-muted)', margin: '4px 0 0', lineHeight: 1.5 }}>
+                Hledej podle receptu nebo příchutě, vrať odečet skladu a načti starší mix zpět do kalkulačky.
+              </p>
+            </div>
+            <div className="toolbar-row">
             <input
               className="app-input"
-              style={{ flex: 1 }}
+              style={{ flex: '1 1 220px' }}
               placeholder="Hledat v historii…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -101,33 +109,34 @@ export default function History({ onLoad }) {
               autoCorrect="off"
               spellCheck="false"
             />
-            <GlassButton
-              onClick={() => setTodayOnly((value) => !value)}
-              style={{
-                fontSize: 12,
-                padding: '8px 12px',
+              <GlassButton
+                onClick={() => setTodayOnly((value) => !value)}
+                style={{
+                  fontSize: 12,
+                  padding: '8px 12px',
                 background: todayOnly ? 'var(--accent)' : undefined,
                 color: todayOnly ? '#0C0C10' : undefined,
                 borderColor: todayOnly ? 'var(--accent)' : undefined,
               }}
-            >
-              Dnes
-            </GlassButton>
-            <GlassButton variant="danger" onClick={() => setConfirmClear(true)} style={{ fontSize: 12, padding: '8px 12px' }}>
-              Vymazat historii
-            </GlassButton>
+              >
+                Dnes
+              </GlassButton>
+              <GlassButton variant="danger" onClick={() => setConfirmClear(true)} style={{ fontSize: 12, padding: '8px 12px' }}>
+                Vymazat historii
+              </GlassButton>
+            </div>
           </div>
           <StatusMessage status={status} compact />
           {filteredItems.length === 0 ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '28px 16px' }}>
+            <div className="panel-surface" style={{ display: 'flex', justifyContent: 'center', padding: '28px 16px' }}>
               <p style={{ color: 'var(--fg-muted)', fontSize: 14, margin: 0 }}>
                 Žádné záznamy pro aktuální filtr
               </p>
             </div>
           ) : filteredItems.map((item) => (
             <SwipeToDelete key={item.id} onDelete={() => handleDelete(item.id)}>
-              <GlassCard>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+              <GlassCard className="panel-surface">
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       {item.recipe_name && (
@@ -168,7 +177,7 @@ export default function History({ onLoad }) {
                       {fmtDateTime(item.created_at)}
                     </p>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <div className="toolbar-row" style={{ flexShrink: 0 }}>
                     {item.stock_deducted === 1 && (
                       <GlassButton onClick={() => handleRevert(item.id)} style={{ fontSize: 12, padding: '6px 10px' }}>
                         Vrátit
@@ -180,7 +189,7 @@ export default function History({ onLoad }) {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(92px, 1fr))', gap: 6, marginTop: 12 }}>
                   <MiniPill label="Objem" value={`${item.volume_ml} ml`} />
                   <MiniPill label="Nikotin" value={`${item.nicotine_mg} mg`} highlight />
                   <MiniPill label="Báze" value={`${item.vg_ratio}/${item.pg_ratio}`} />
@@ -190,7 +199,73 @@ export default function History({ onLoad }) {
                 </div>
 
                 {item.note && (
-                  <p style={{ fontSize: 12, color: 'var(--fg-muted)', margin: '8px 0 0' }}>{item.note}</p>
+                  <p style={{ fontSize: 12, color: 'var(--fg-muted)', margin: '10px 0 0', lineHeight: 1.5 }}>{item.note}</p>
+                )}
+
+                {item.used_stock_items?.length > 0 && (
+                  <div style={{
+                    marginTop: 10,
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid var(--border)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}>
+                    <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-subtle)', margin: 0 }}>
+                      Použité položky skladu
+                    </p>
+                    {item.used_stock_items.map((used) => (
+                      <div
+                        key={`${item.id}-${used.stock_id}-${used.type}`}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ fontSize: 12, color: 'var(--fg)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {used.name}
+                          </p>
+                          <p style={{ fontSize: 11, color: 'var(--fg-subtle)', margin: '2px 0 0' }}>
+                            {labelForType(used.type)}
+                            {used.bottle_ml != null ? ` • lahvička ${fmt1(used.bottle_ml)} ml` : ''}
+                          </p>
+                        </div>
+                        <span className="mono" style={{ fontSize: 12, color: 'var(--fg-muted)', flexShrink: 0 }}>
+                          −{fmt1(used.deducted_ml)} ml
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {item.used_stock_summary?.length > 0 && (
+                  <div style={{
+                    marginTop: 8,
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    background: 'rgba(255,255,255,0.02)',
+                    border: '1px solid var(--border)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}>
+                    <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-subtle)', margin: 0 }}>
+                      Cena po složkách
+                    </p>
+                    {item.used_stock_summary.map((part) => (
+                      <div
+                        key={`${item.id}-summary-${part.key}`}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
+                      >
+                        <span style={{ fontSize: 12, color: 'var(--fg)' }}>
+                          {part.label}
+                        </span>
+                        <span className="mono" style={{ fontSize: 12, color: part.total_cost_czk != null ? 'var(--fg-muted)' : 'var(--fg-subtle)' }}>
+                          {part.total_cost_czk != null ? `~${part.total_cost_czk.toFixed(2)} Kč` : 'bez ceny'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </GlassCard>
             </SwipeToDelete>
@@ -249,4 +324,14 @@ function fmtDateTime(str) {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
+}
+
+function labelForType(type) {
+  return ({
+    baze_mtl: 'Báze MTL',
+    baze_dl: 'Báze DL',
+    booster_mtl: 'Booster MTL',
+    booster_dl: 'Booster DL',
+    prichut: 'Příchuť',
+  })[type] || type;
 }

@@ -101,13 +101,18 @@ export default function App() {
   if (isDesktop) {
     return (
       <div style={{
-        position: 'fixed', top: 20, bottom: 20, left: 0, right: 0,
-        maxWidth: 960, margin: '0 auto',
+        position: 'fixed', top: 18, bottom: 18, left: 0, right: 0,
+        maxWidth: 1080, margin: '0 auto',
+        padding: '0 18px',
+      }}>
+        <div style={{
+        height: '100%',
         display: 'flex', flexDirection: 'row',
-        background: 'var(--bg)',
+        background: 'linear-gradient(180deg, rgba(22,22,28,0.98), rgba(12,12,16,0.98))',
         overflow: 'hidden',
-        borderRadius: 20,
-        boxShadow: '0 0 0 1px rgba(255,255,255,0.08), 0 0 0 1px rgba(0,194,170,0.06), 0 24px 80px rgba(0,0,0,0.7)',
+        borderRadius: 28,
+        border: '1px solid rgba(255,255,255,0.08)',
+        boxShadow: '0 0 0 1px rgba(0,194,170,0.06), 0 28px 90px rgba(0,0,0,0.62)',
       }}>
         <SideNav active={tab} onChange={changeTab} badges={{ stock: stockBadge }} onSettings={() => setSettingsOpen(true)} />
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
@@ -115,6 +120,7 @@ export default function App() {
           {contentArea}
         </div>
         <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} prefs={prefs} updatePref={updatePref} />
+        </div>
       </div>
     );
   }

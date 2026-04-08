@@ -10,6 +10,7 @@ const HARDWARE_PATTERN = /\(odpor:/i;
 
 const BOOSTER_KEYWORDS = ['booster', 'nikotin shot', 'nic shot', ' shot '];
 const BASE_KEYWORDS = ['báze', 'base mix', 'základna', 'base vg', 'base pg'];
+const SHAKE_VAPE_PATTERN = /shake\s*&\s*vape|shake and vape|shortfill|snv|mix\s*&\s*go|mix and go|mixgo/i;
 
 function shouldSkip(rawName) {
   if (HARDWARE_PATTERN.test(rawName)) return true;
@@ -57,6 +58,30 @@ function extractMl(name) {
   return 0;
 }
 
+function extractAllMlValues(name) {
+  return [...name.matchAll(/(\d+)\s*ml/gi)]
+    .map((match) => parseInt(match[1], 10))
+    .filter((value) => value > 0);
+}
+
+function detectShakeAndVape(text) {
+  if (!SHAKE_VAPE_PATTERN.test(text)) return null;
+
+  const values = extractAllMlValues(text);
+  if (values.length === 0) return null;
+
+  const bottle_ml = Math.max(...values);
+  const flavor_ml = Math.min(...values);
+
+  if (!bottle_ml || bottle_ml === flavor_ml) return null;
+
+  return { bottle_ml, flavor_ml };
+}
+
+function detectShakeAndVapeWithoutVolume(text) {
+  return SHAKE_VAPE_PATTERN.test(text) && extractAllMlValues(text).length === 0;
+}
+
 function cleanProductName(raw) {
   return raw
     .replace(/\s*\(kód:[^)]*\)/gi, '')       // (Kód: SN-DIY5097)
@@ -99,21 +124,34 @@ export function parseOrderEmail(text) {
 
     if (shouldSkip(rawName)) continue;
 
-    const amount_ml = extractMl(rawName);
+    const scanText = cols.join(' ');
+    const shakeInfo = detectShakeAndVape(scanText);
+    const shakeWithoutVolume = !shakeInfo && detectShakeAndVapeWithoutVolume(scanText);
+    const amount_ml = shakeInfo ? shakeInfo.flavor_ml : extractMl(scanText);
     const cleanName = cleanProductName(rawName);
     if (!cleanName || cleanName.length < 3) continue;
 
     const type = detectType(cleanName);
-    const capacity_ml = amount_ml > 0 ? amount_ml : (type === 'prichut' ? 30 : 500);
+    const capacity_ml = shakeInfo
+      ? shakeInfo.flavor_ml
+      : amount_ml > 0 ? amount_ml : (type === 'prichut' ? 30 : 500);
     const price_czk = extractPrice(cols) ?? null;
+    const note = shakeInfo
+      ? `Shake & Vape: ${shakeInfo.flavor_ml} ml příchutě v ${shakeInfo.bottle_ml} ml lahvičce`
+      : shakeWithoutVolume
+        ? 'Shake & Vape / shortfill rozpoznán, ale e-mail neobsahuje objem. Doplňte ručně množství aromatu a kapacitu.'
+      : null;
 
     items.push({
       name: cleanName,
       type,
       amount_ml,
       capacity_ml,
+      bottle_ml: shakeInfo?.bottle_ml ?? null,
       price_czk,
-      note: null,
+      note,
+      is_shake_and_vape: Boolean(shakeInfo || shakeWithoutVolume),
+      needs_volume_input: Boolean(shakeWithoutVolume),
       selected: true,
     });
   }

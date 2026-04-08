@@ -26,6 +26,8 @@ export default function CalculatorParameterCard({
   setCustomBoosterVisible,
   selectBoosterPreset,
   handleReset,
+  shakeFlavorHint,
+  applyFlavorStockAmount,
 }) {
   return (
     <GlassCard>
@@ -53,6 +55,38 @@ export default function CalculatorParameterCard({
           {flavorMode === 'pct'
             ? <GlassInput value={flavorPct} onChange={setFlavorPct} min={0} max={50} step={1} suffix="%" inputMode="decimal" />
             : <GlassInput value={flavorMlInput} onChange={handleFlavorMlChange} min={0} step={0.5} suffix="ml" inputMode="decimal" />}
+          {shakeFlavorHint && (
+            <div style={{
+              marginTop: 4,
+              padding: '8px 10px',
+              borderRadius: 8,
+              background: 'rgba(24, 190, 178, 0.08)',
+              border: '1px solid rgba(24, 190, 178, 0.22)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+            }}>
+              <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
+                Vybraná příchuť má {shakeFlavorHint.amountMl.toFixed(1)} ml. Pro shortfill bývá praktičtější zadat ji přímo v ml.
+              </span>
+              <button
+                type="button"
+                onClick={applyFlavorStockAmount}
+                style={{
+                  flexShrink: 0,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: 'var(--accent)',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                }}
+              >
+                {shakeFlavorHint.label}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -50,8 +50,50 @@ export default function OrderImportSheet({ open, onClose, onImport }) {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, price_czk } : item));
   }
 
+  function changeAmount(idx, raw) {
+    const value = raw === '' ? 0 : (parseFloat(raw.replace(',', '.')) || 0);
+    setItems(prev => prev.map((item, i) => i === idx ? {
+      ...item,
+      amount_ml: value,
+      capacity_ml: item.is_shake_and_vape ? value : item.capacity_ml,
+      needs_volume_input: item.is_shake_and_vape
+        ? value <= 0 || (item.bottle_ml ?? 0) <= 0
+        : value <= 0 || item.capacity_ml <= 0,
+    } : item));
+  }
+
+  function changeCapacity(idx, raw) {
+    const value = raw === '' ? 0 : (parseFloat(raw.replace(',', '.')) || 0);
+    setItems(prev => prev.map((item, i) => i === idx ? {
+      ...item,
+      capacity_ml: value,
+      needs_volume_input: item.amount_ml <= 0 || value <= 0,
+    } : item));
+  }
+
+  function changeBottle(idx, raw) {
+    const value = raw === '' ? 0 : (parseFloat(raw.replace(',', '.')) || 0);
+    setItems(prev => prev.map((item, i) => i === idx ? {
+      ...item,
+      bottle_ml: value,
+      needs_volume_input: item.amount_ml <= 0 || value <= 0,
+    } : item));
+  }
+
   function handleConfirm() {
-    onImport(items.filter(i => i.selected));
+    const selected = items.filter(i => i.selected);
+    const invalid = selected.find((item) => (
+      item.is_shake_and_vape
+        ? item.amount_ml <= 0 || (item.bottle_ml ?? 0) <= 0
+        : item.amount_ml <= 0 || item.capacity_ml <= 0
+    ));
+    if (invalid) {
+      setError(invalid.is_shake_and_vape
+        ? 'U shake & vape položek doplňte množství aromatu i velikost lahvičky v ml.'
+        : 'U vybraných položek musí být vyplněno množství i kapacita v ml.');
+      return;
+    }
+    onImport(selected.map((item) => normalizeImportItem(item)));
     handleClose();
   }
 
@@ -83,6 +125,9 @@ export default function OrderImportSheet({ open, onClose, onImport }) {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {error && (
+            <p style={{ fontSize: 13, color: 'var(--danger)', margin: 0 }}>{error}</p>
+          )}
           <p style={{ fontSize: 13, color: 'var(--fg-muted)', margin: 0 }}>
             Rozpoznáno {items.length} {items.length === 1 ? 'produkt' : items.length < 5 ? 'produkty' : 'produktů'}. Zkontrolujte typy a vyberte co přidat.
           </p>
@@ -116,9 +161,45 @@ export default function OrderImportSheet({ open, onClose, onImport }) {
                     {item.name}
                   </p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                    {item.amount_ml > 0 && (
-                      <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{item.amount_ml} ml</span>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        placeholder={item.is_shake_and_vape ? 'aroma' : 'ml'}
+                        value={item.amount_ml || ''}
+                        onChange={e => { e.stopPropagation(); changeAmount(idx, e.target.value); setError(''); }}
+                        onClick={e => e.stopPropagation()}
+                        disabled={!item.selected}
+                        style={{
+                          width: 54, padding: '3px 6px', fontSize: 11,
+                          background: 'var(--bg-input)', border: '1px solid var(--border)',
+                          borderRadius: 6, color: 'var(--fg)', outline: 'none',
+                        }}
+                      />
+                      <span style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>/</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        placeholder={item.is_shake_and_vape ? 'lahv.' : 'kap.'}
+                        value={item.is_shake_and_vape ? (item.bottle_ml || '') : (item.capacity_ml || '')}
+                        onChange={e => {
+                          e.stopPropagation();
+                          if (item.is_shake_and_vape) changeBottle(idx, e.target.value);
+                          else changeCapacity(idx, e.target.value);
+                          setError('');
+                        }}
+                        onClick={e => e.stopPropagation()}
+                        disabled={!item.selected}
+                        style={{
+                          width: 54, padding: '3px 6px', fontSize: 11,
+                          background: 'var(--bg-input)', border: '1px solid var(--border)',
+                          borderRadius: 6, color: 'var(--fg)', outline: 'none',
+                        }}
+                      />
+                      <span style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>ml</span>
+                    </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                       <input
                         type="number"
@@ -138,6 +219,11 @@ export default function OrderImportSheet({ open, onClose, onImport }) {
                       <span style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>Kč</span>
                     </div>
                   </div>
+                  {item.note && (
+                    <p style={{ fontSize: 11, color: item.needs_volume_input ? 'var(--accent-warm)' : 'var(--fg-subtle)', margin: '4px 0 0' }}>
+                      {buildPreviewNote(item)}
+                    </p>
+                  )}
                 </div>
                 <select
                   value={item.type}
@@ -174,4 +260,29 @@ export default function OrderImportSheet({ open, onClose, onImport }) {
       )}
     </BottomSheet>
   );
+}
+
+function normalizeImportItem(item) {
+  if (!item.is_shake_and_vape) return item;
+
+  const flavorMl = item.amount_ml;
+  const bottleMl = item.bottle_ml ?? 0;
+
+  return {
+    ...item,
+    amount_ml: flavorMl,
+    capacity_ml: flavorMl,
+    bottle_ml: bottleMl > 0 ? bottleMl : null,
+    note: bottleMl > 0
+      ? `Shake & Vape: ${flavorMl} ml příchutě v ${bottleMl} ml lahvičce`
+      : item.note,
+  };
+}
+
+function buildPreviewNote(item) {
+  if (item.is_shake_and_vape && item.amount_ml > 0 && (item.bottle_ml ?? 0) > 0) {
+    return `Shake & Vape: ${item.amount_ml} ml příchutě v ${item.bottle_ml} ml lahvičce`;
+  }
+
+  return item.note;
 }

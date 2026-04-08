@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "node scripts/generate-icons.js && vite build",
     "preview": "vite preview",
-    "test": "node --test src/lib/calc.test.js"
+    "test": "node --test src/lib/*.test.js"
   },
   "dependencies": {
     "react": "^19.0.0",

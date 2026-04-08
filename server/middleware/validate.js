@@ -17,13 +17,14 @@ export function validateRecipe(req, res, next) {
 const VALID_TYPES = ['baze_mtl', 'baze_dl', 'booster_mtl', 'booster_dl', 'prichut'];
 
 export function validateStock(req, res, next) {
-  const { name, type, amount_ml, capacity_ml } = req.body;
+  const { name, type, amount_ml, capacity_ml, bottle_ml } = req.body;
   const errors = [];
 
   if (!name || typeof name !== 'string' || !name.trim()) errors.push('name je povinný');
   if (!type || !VALID_TYPES.includes(type)) errors.push(`type musí být jeden z: ${VALID_TYPES.join(', ')}`);
   if (amount_ml != null && (isNaN(Number(amount_ml)) || Number(amount_ml) < 0)) errors.push('amount_ml musí být >= 0');
   if (capacity_ml != null && (isNaN(Number(capacity_ml)) || Number(capacity_ml) <= 0)) errors.push('capacity_ml musí být > 0');
+  if (bottle_ml != null && (isNaN(Number(bottle_ml)) || Number(bottle_ml) < 0)) errors.push('bottle_ml musí být >= 0');
 
   if (errors.length) return res.status(400).json({ errors });
   next();
@@ -55,6 +56,7 @@ export function validateMix(req, res, next) {
     base_type, deduct_stock, recipe_id, recipe_name, flavor_name, note,
     volume_ml, nicotine_mg, vg_ratio, pg_ratio, booster_strength,
     booster_ml, base_ml, flavor_ml, flavor_pct,
+    base_stock_id, booster_stock_id, flavor_stock_id,
   } = req.body;
   const errors = [];
 
@@ -65,6 +67,9 @@ export function validateMix(req, res, next) {
   if (base_type != null && !['MTL', 'DL', 'custom'].includes(base_type)) errors.push('base_type musí být MTL, DL nebo custom');
   if (deduct_stock != null && typeof deduct_stock !== 'boolean') errors.push('deduct_stock musí být boolean');
   if (recipe_id != null && (isNaN(Number(recipe_id)) || Number(recipe_id) < 1)) errors.push('recipe_id musí být kladné číslo');
+  if (base_stock_id != null && (isNaN(Number(base_stock_id)) || Number(base_stock_id) < 1)) errors.push('base_stock_id musí být kladné číslo');
+  if (booster_stock_id != null && (isNaN(Number(booster_stock_id)) || Number(booster_stock_id) < 1)) errors.push('booster_stock_id musí být kladné číslo');
+  if (flavor_stock_id != null && (isNaN(Number(flavor_stock_id)) || Number(flavor_stock_id) < 1)) errors.push('flavor_stock_id musí být kladné číslo');
   if (recipe_name != null && typeof recipe_name !== 'string') errors.push('recipe_name musí být text');
   if (flavor_name != null && typeof flavor_name !== 'string') errors.push('flavor_name musí být text');
   if (note != null && typeof note !== 'string') errors.push('note musí být text');

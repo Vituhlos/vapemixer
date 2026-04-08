@@ -56,7 +56,7 @@ function ResultRow({ label, value, unit, bottles, highlight, danger }) {
   );
 }
 
-export default function ResultSectionCard({ result, nicMode, nicotine, vg, pg, fmt1, stockWarnings }) {
+export default function ResultSectionCard({ result, nicMode, nicotine, vg, pg, fmt1, stockWarnings, estimatedCost }) {
   if (!result) return null;
 
   const warnings = [
@@ -64,9 +64,14 @@ export default function ResultSectionCard({ result, nicMode, nicotine, vg, pg, f
     ...stockWarnings.map((text) => ({ type: 'warning', text })),
   ];
 
+  if (estimatedCost?.incomplete) {
+    warnings.push({ type: 'warning', text: 'Cena míchání je jen orientační nebo neúplná, některé položky nemají cenu.' });
+  }
+
   return (
-    <GlassCard>
-      <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--fg-muted)', display: 'block', marginBottom: 12 }}>Výsledek</span>
+    <GlassCard className="panel-surface">
+      <div className="section-kicker">Výsledek</div>
+      <p style={{ fontSize: 14, fontWeight: 700, margin: '6px 0 12px' }}>Finální rozpad směsi a odhad ceny</p>
       <div className="grid grid-cols-2 gap-3">
         <ResultRow label="Báze" value={fmt1(result.baseMl)} unit="ml" danger={result.baseMl <= 0} />
         <ResultRow label="Booster" value={fmt1(result.boosterMl)} unit="ml" bottles={result.boosterBottles} />
@@ -75,6 +80,65 @@ export default function ResultSectionCard({ result, nicMode, nicotine, vg, pg, f
           ? <ResultRow label="Výsledná síla" value={nicotine} unit="mg/ml" highlight />
           : <ResultRow label="Poměr" value={`${vg}/${pg}`} unit="VG/PG" highlight />}
       </div>
+
+      {estimatedCost?.total != null && (
+        <div style={{
+          marginTop: 12,
+          padding: '10px 12px',
+          borderRadius: 10,
+          background: 'var(--bg-elevated)',
+          border: '1px solid var(--border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}>
+          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--fg-muted)' }}>
+            Odhad Ceny
+          </span>
+          <span className="mono" style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>
+            ~{estimatedCost.total.toFixed(2)} Kč
+          </span>
+        </div>
+      )}
+
+      {estimatedCost?.parts?.length > 0 && (
+        <div style={{
+          marginTop: 8,
+          padding: '8px 10px',
+          borderRadius: 10,
+          background: 'rgba(255,255,255,0.03)',
+          border: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+        }}>
+          {estimatedCost.parts.map((part) => (
+            <div
+              key={part.key}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                fontSize: 12,
+              }}
+            >
+              <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <span style={{ color: 'var(--fg)' }}>
+                  {part.label}
+                </span>
+                <span style={{ color: 'var(--fg-subtle)', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {part.itemName ? `${part.itemName} • ${fmt1(part.needed)} ml` : `${fmt1(part.needed)} ml`}
+                </span>
+              </div>
+              <span className="mono" style={{ color: part.total != null ? 'var(--fg)' : 'var(--fg-subtle)', flexShrink: 0 }}>
+                {part.total != null ? `~${part.total.toFixed(2)} Kč` : 'bez ceny'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <StatusStack items={warnings} compact className="mt-3" />
     </GlassCard>

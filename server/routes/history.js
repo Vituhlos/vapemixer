@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import db from '../db.js';
 import { validateHistory } from '../middleware/validate.js';
+import { parseUsedStockItems, resolveBasePreset, roundMl, summarizeUsedStockItems } from '../services/mixing.js';
 
 const router = Router();
 
@@ -9,35 +10,41 @@ const STOCK_TYPE_MAP = {
   DL:  { base: 'baze_dl',  booster: 'booster_dl' },
 };
 
-function resolveBasePreset(vgRatio, pgRatio) {
-  if (Number(vgRatio) === 50 && Number(pgRatio) === 50) return 'MTL';
-  if (Number(vgRatio) === 70 && Number(pgRatio) === 30) return 'DL';
-  return 'MTL';
-}
-
 const getFirstStockByType = db.prepare('SELECT * FROM stock WHERE type = ? ORDER BY created_at ASC, id ASC LIMIT 1');
 const getFlavorStockByName = db.prepare('SELECT * FROM stock WHERE type = \'prichut\' AND LOWER(name) = LOWER(?) ORDER BY created_at ASC, id ASC LIMIT 1');
-const addToStock = db.prepare('UPDATE stock SET amount_ml = MIN(amount_ml + ?, capacity_ml) WHERE id = ?');
+const setStockAmount = db.prepare('UPDATE stock SET amount_ml = ? WHERE id = ?');
 const markNotDeducted = db.prepare('UPDATE history SET stock_deducted = 0 WHERE id = ?');
+const getStockById = db.prepare('SELECT * FROM stock WHERE id = ?');
+
+function addToStock(item, amount) {
+  const nextAmount = Math.min(Number(item.capacity_ml || 0), roundMl(Number(item.amount_ml || 0) + Number(amount || 0)));
+  setStockAmount.run(nextAmount, item.id);
+}
 
 const revertMixTransaction = db.transaction((entry) => {
   const basePreset = resolveBasePreset(entry.vg_ratio, entry.pg_ratio);
   const stockTypes = STOCK_TYPE_MAP[basePreset];
 
   if (entry.base_ml > 0) {
-    const item = getFirstStockByType.get(stockTypes.base);
-    if (item) addToStock.run(entry.base_ml, item.id);
+    const item = entry.base_stock_id
+      ? getStockById.get(entry.base_stock_id)
+      : getFirstStockByType.get(stockTypes.base);
+    if (item) addToStock(item, entry.base_ml);
   }
   if (entry.booster_ml > 0) {
-    const item = getFirstStockByType.get(stockTypes.booster);
-    if (item) addToStock.run(entry.booster_ml, item.id);
+    const item = entry.booster_stock_id
+      ? getStockById.get(entry.booster_stock_id)
+      : getFirstStockByType.get(stockTypes.booster);
+    if (item) addToStock(item, entry.booster_ml);
   }
   if (entry.flavor_ml > 0) {
     const flavorName = entry.flavor_name?.trim() || null;
-    const item = flavorName
-      ? getFlavorStockByName.get(flavorName) ?? getFirstStockByType.get('prichut')
-      : getFirstStockByType.get('prichut');
-    if (item) addToStock.run(entry.flavor_ml, item.id);
+    const item = entry.flavor_stock_id
+      ? getStockById.get(entry.flavor_stock_id)
+      : flavorName
+        ? getFlavorStockByName.get(flavorName) ?? getFirstStockByType.get('prichut')
+        : getFirstStockByType.get('prichut');
+    if (item) addToStock(item, entry.flavor_ml);
   }
 
   markNotDeducted.run(entry.id);
@@ -45,7 +52,12 @@ const revertMixTransaction = db.transaction((entry) => {
 });
 
 router.get('/', (req, res) => {
-  const rows = db.prepare('SELECT * FROM history ORDER BY created_at DESC').all();
+  const rows = db.prepare('SELECT * FROM history ORDER BY created_at DESC').all()
+    .map((row) => ({
+      ...row,
+      used_stock_items: parseUsedStockItems(row.used_stock_json),
+      used_stock_summary: summarizeUsedStockItems(parseUsedStockItems(row.used_stock_json)),
+    }));
   res.json(rows);
 });
 
